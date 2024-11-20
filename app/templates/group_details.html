@@ -5,17 +5,25 @@
     <div class="row">
         <div class="col-md-8">
             {% if current_user.id == group.created_by_id %}
-            <div class="d-flex align-items-center">
-                <h2 id="groupName" class="mb-0" onclick="toggleGroupNameEdit()" style="cursor: pointer;">
-                    {{ group.name }}
-                    <small><i class="fas fa-edit text-muted ms-2"></i></small>
-                </h2>
-                <form id="editGroupNameForm" class="d-none ms-2">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="newGroupName" value="{{ group.name }}" required>
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <button type="button" class="btn btn-secondary" onclick="cancelGroupNameEdit()">Cancel</button>
-                    </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <h2 id="groupName" class="mb-0" onclick="toggleGroupNameEdit()" style="cursor: pointer;">
+                        {{ group.name }}
+                        <small><i class="fas fa-edit text-muted ms-2"></i></small>
+                    </h2>
+                    <form id="editGroupNameForm" class="d-none ms-2">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="newGroupName" value="{{ group.name }}" required>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-secondary" onclick="cancelGroupNameEdit()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                <form action="{{ url_for('groups.delete_group', group_id=group.id) }}" method="POST" 
+                      onsubmit="return confirm('Are you sure you want to delete this group? This action cannot be undone.');">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> Delete Group
+                    </button>
                 </form>
             </div>
             {% else %}

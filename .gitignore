@@ -1,4 +1,4 @@
-# Python
+# Python Backend
 __pycache__/
 *.py[cod]
 *$py.class
@@ -54,9 +54,24 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
-# Project specific
-migrations/
-*.db-journal
+# Next.js Frontend
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/node_modules/
+frontend/.env*.local
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Coverage
+coverage/
 .coverage
 htmlcov/
 .pytest_cache/
@@ -64,33 +79,8 @@ coverage.xml
 *.cover
 *.py,cover
 
-# Dependencies
-node_modules/
-package-lock.json
-yarn.lock
-
-# Compiled files
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# Distribution / packaging
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Local Development
+*.local
+.env
+.env.*
+!.env.example

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from .models import Group, User, db, Expense
+from .models import Group, User, db, Expense, ExpenseSplit, group_members
 from flask_wtf.csrf import validate_csrf
 
 # Create groups blueprint
@@ -118,6 +118,39 @@ def update_group_name(group_id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@groups.route('/group/<int:group_id>/delete', methods=['POST'])
+@login_required
+def delete_group(group_id):
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except:
+        flash('Invalid CSRF token. Please try again.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    group = Group.query.get_or_404(group_id)
+    
+    # Only group creator can delete the group
+    if current_user.id != group.created_by_id:
+        flash('You are not authorized to delete this group.', 'danger')
+        return redirect(url_for('groups.view_group', group_id=group_id))
+    
+    # Delete all expenses in the group
+    expenses = Expense.query.filter_by(group_id=group_id).all()
+    for expense in expenses:
+        # Delete all splits for each expense
+        ExpenseSplit.query.filter_by(expense_id=expense.id).delete()
+        db.session.delete(expense)
+    
+    # Delete all user-group associations using the group_members table
+    db.session.execute(group_members.delete().where(group_members.c.group_id == group_id))
+    
+    # Delete the group
+    db.session.delete(group)
+    db.session.commit()
+    
+    flash('Group has been deleted successfully.', 'success')
+    return redirect(url_for('main.dashboard'))
 
 @groups.route('/search_users')
 @login_required
