@@ -1,4 +1,4 @@
-# Splitwise Clone
+# SplitEase
 
 ## Setup Instructions
 

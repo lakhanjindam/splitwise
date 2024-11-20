@@ -1,19 +1,36 @@
-from flask import Flask
+from flask import Flask, jsonify
 from config import Config
 from .extensions import db, migrate, login_manager
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_cors import CORS
 
 csrf = CSRFProtect()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
+    # Configure CORS
+    CORS(app, resources={
+        r"/*": {
+            "origins": ["http://localhost:3000"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "X-CSRF-Token"],
+            "supports_credentials": True
+        }
+    })
 
     # Initialize Flask extensions
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+
+    # CSRF token endpoint
+    @app.route('/api/csrf-token', methods=['GET'])
+    def get_csrf_token():
+        token = generate_csrf()
+        return jsonify({'csrf_token': token})
 
     # Register blueprints
     from .auth import auth as auth_blueprint

@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
-from flask_login import login_user, login_required, logout_user
+from flask import Blueprint, request, jsonify
+from flask_login import login_user, login_required, logout_user, current_user
 from .models import User, db
 from werkzeug.security import check_password_hash
 
@@ -12,16 +12,36 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
+        if not username or not password:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing username or password'
+            }), 400
+        
         # Check if user exists
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('main.dashboard'))
+            return jsonify({
+                'status': 'success',
+                'message': 'Login successful',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email
+                }
+            })
         else:
-            flash('Invalid username or password')
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid username or password'
+            }), 401
     
-    return render_template('login.html')
+    return jsonify({
+        'status': 'error',
+        'message': 'Method not allowed'
+    }), 405
 
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
@@ -30,29 +50,72 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         
+        # Validate required fields
+        if not username or not email or not password:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required fields'
+            }), 400
+        
         # Check if user already exists
         if User.query.filter_by(username=username).first():
-            flash('Username already exists')
-            return redirect(url_for('auth.register'))
+            return jsonify({
+                'status': 'error',
+                'message': 'Username already exists'
+            }), 400
         
         if User.query.filter_by(email=email).first():
-            flash('Email already registered')
-            return redirect(url_for('auth.register'))
+            return jsonify({
+                'status': 'error',
+                'message': 'Email already registered'
+            }), 400
         
-        # Create new user
-        new_user = User(username=username, email=email)
-        new_user.set_password(password)
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash('Registration successful. Please log in.')
-        return redirect(url_for('auth.login'))
+        try:
+            # Create new user
+            new_user = User(username=username, email=email)
+            new_user.set_password(password)
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Registration successful',
+                'user': {
+                    'username': username,
+                    'email': email
+                }
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to create account',
+                'error': str(e)
+            }), 500
     
-    return render_template('register.html')
+    return jsonify({
+        'status': 'error',
+        'message': 'Method not allowed'
+    }), 405
+
+@auth.route('/api/user')
+@login_required
+def get_current_user():
+    return jsonify({
+        'status': 'success',
+        'user': {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email
+        }
+    })
 
 @auth.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('main.index'))
+    return jsonify({
+        'status': 'success',
+        'message': 'Logged out successfully'
+    })

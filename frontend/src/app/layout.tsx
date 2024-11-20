@@ -1,19 +1,32 @@
-'use client'
+import { Inter } from 'next/font/google';
+import { Metadata } from 'next';
+import { Providers } from './providers';
+import '@/styles/global.css';
 
-import { ThemeProvider } from 'next-themes'
-import { Inter } from 'next/font/google'
-import '../styles/global.css'
+const inter = Inter({ subsets: ['latin'] });
 
-const inter = Inter({ subsets: ['latin'] })
+export const metadata: Metadata = {
+  title: 'SplitEase',
+  description: 'A modern expense sharing application',
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <Providers
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           {children}
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
-  )
+  );
 }

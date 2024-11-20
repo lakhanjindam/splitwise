@@ -60,12 +60,19 @@ export default function LandingPage() {
                   finances.
                 </p>
               </div>
-              <Link href="/expenses">
-                <Button size="lg" className="transition-all duration-200 hover:scale-105">
-                  Let's Get Started
-                  <DollarSign className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+              <div className="flex gap-4">
+                <Link href="/auth/register">
+                  <Button size="lg" className="transition-all duration-200 hover:scale-105">
+                    Get Started
+                    <DollarSign className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/auth/login">
+                  <Button size="lg" variant="outline" className="transition-all duration-200 hover:scale-105">
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
@@ -111,20 +118,25 @@ export default function LandingPage() {
                   Join thousands of users who trust SplitEase for hassle-free expense sharing.
                 </p>
               </div>
-              <Link href="/expenses">
-                <Button
-                  size="lg"
-                  className="transition-all duration-300 ease-in-out">
-                  Add Your First Expense
-                  <DollarSign className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+              <div className="flex gap-4">
+                <Link href="/auth/register">
+                  <Button size="lg" className="transition-all duration-200 hover:scale-105">
+                    Get Started
+                    <DollarSign className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/auth/login">
+                  <Button size="lg" variant="outline" className="transition-all duration-200 hover:scale-105">
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
       </main>
       <footer className="relative z-10 flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">© 2024 SplitEase. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground"> 2024 SplitEase. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link className="text-xs hover:underline underline-offset-4 transition-all duration-200 hover:text-primary" href="/terms">
             Terms of Service
