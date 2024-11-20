@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Add Member to {{ group.name }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               required autocomplete="off" placeholder="Start typing username...">
+                        <div id="userList" class="list-group mt-2"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Member</button>
+                    <a href="{{ url_for('groups.view_group', group_id=group.id) }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const usernameInput = document.getElementById('username');
+const userList = document.getElementById('userList');
+
+usernameInput.addEventListener('input', async function() {
+    const query = this.value.trim();
+    if (query.length < 2) {
+        userList.innerHTML = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/search_users?q=${encodeURIComponent(query)}`);
+        const users = await response.json();
+        
+        userList.innerHTML = users.map(user => `
+            <a href="#" class="list-group-item list-group-item-action" 
+               onclick="selectUser('${user.username}'); return false;">
+                ${user.username} (${user.email})
+            </a>
+        `).join('');
+    } catch (error) {
+        console.error('Error searching users:', error);
+    }
+});
+
+function selectUser(username) {
+    usernameInput.value = username;
+    userList.innerHTML = '';
+}
+</script>
+{% endblock %}

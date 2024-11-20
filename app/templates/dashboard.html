@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Balances Section -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Your Balances</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% if balances %}
+                        {% for balance in balances %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span>{{ balance.user.username }}</span>
+                                    <small class="text-muted d-block">in {{ balance.group.name }}</small>
+                                </div>
+                                <span class="{% if balance.balance > 0 %}text-success{% elif balance.balance < 0 %}text-danger{% endif %}">
+                                    {% if balance.balance > 0 %}
+                                        Owed {{ balance.group.get_currency_symbol() }}{{ "%.2f"|format(balance.balance) }}
+                                    {% elif balance.balance < 0 %}
+                                        Owes {{ balance.group.get_currency_symbol() }}{{ "%.2f"|format(-balance.balance) }}
+                                    {% else %}
+                                        Settled
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item text-muted">No balances to show</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Groups Section -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Your Groups</h5>
+                    <a href="{{ url_for('groups.create_group') }}" class="btn btn-sm btn-primary">Create Group</a>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% if groups %}
+                        {% for group in groups %}
+                        <a href="{{ url_for('groups.view_group', group_id=group.id) }}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            {{ group.name }}
+                            <span class="badge bg-primary rounded-pill">
+                                {{ group.get_member_count() }} members
+                            </span>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item text-muted">No groups yet</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Expenses Section -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Expenses</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% if recent_expenses %}
+                        {% for expense in recent_expenses %}
+                        <a href="{{ url_for('expenses.view_expense', expense_id=expense.id) }}" 
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ expense.description }}</h6>
+                                <small>{{ expense.date.strftime('%Y-%m-%d') }}</small>
+                            </div>
+                            <p class="mb-1">
+                                {{ expense.group.get_currency_symbol() }}{{ "%.2f"|format(expense.amount) }} 
+                                {% if expense.group %}
+                                    in {{ expense.group.name }}
+                                {% endif %}
+                                paid by {{ expense.payer.username }}
+                            </p>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item text-muted">No recent expenses</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

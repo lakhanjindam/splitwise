@@ -1,0 +1,298 @@
+/* Light theme (default) */
+:root {
+    /* Base colors */
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --text-muted: #6c757d;
+    --text-hover: #495057;
+    
+    /* Navigation */
+    --navbar-bg: #0d6efd;
+    --navbar-text: #ffffff;
+    
+    /* Components */
+    --card-bg: #ffffff;
+    --card-border: #dee2e6;
+    --input-bg: #ffffff;
+    --input-border: #ced4da;
+    --input-text: #333333;
+    
+    /* List groups */
+    --list-group-bg: #ffffff;
+    --list-group-hover: #f8f9fa;
+    --list-group-border: #dee2e6;
+    
+    /* Buttons */
+    --btn-primary-bg: #0d6efd;
+    --btn-primary-text: #ffffff;
+    --btn-secondary-bg: #6c757d;
+    --btn-secondary-text: #ffffff;
+    
+    /* Tables */
+    --table-border: #dee2e6;
+    --table-stripe: rgba(0, 0, 0, 0.05);
+    --table-hover: rgba(0, 0, 0, 0.075);
+    
+    /* Alerts and notifications */
+    --alert-bg: #f8f9fa;
+    --alert-border: #dee2e6;
+    
+    /* Dropdown */
+    --dropdown-bg: #ffffff;
+    --dropdown-text: #333333;
+    --dropdown-hover: #f8f9fa;
+    --dropdown-border: rgba(0, 0, 0, 0.15);
+}
+
+/* Dark theme */
+:root[data-theme="dark"] {
+    /* Base colors */
+    --bg-color: #1a1a1a;
+    --text-color: #e1e1e1;
+    --text-muted: #a0a0a0;
+    --text-hover: #ffffff;
+    
+    /* Navigation */
+    --navbar-bg: #2c3e50;
+    --navbar-text: #ffffff;
+    
+    /* Components */
+    --card-bg: #2d2d2d;
+    --card-border: #404040;
+    --input-bg: #333333;
+    --input-border: #404040;
+    --input-text: #e1e1e1;
+    
+    /* List groups */
+    --list-group-bg: #2d2d2d;
+    --list-group-hover: #383838;
+    --list-group-border: #404040;
+    
+    /* Buttons */
+    --btn-primary-bg: #2980b9;
+    --btn-primary-text: #ffffff;
+    --btn-secondary-bg: #505a64;
+    --btn-secondary-text: #ffffff;
+    
+    /* Tables */
+    --table-border: #404040;
+    --table-stripe: rgba(255, 255, 255, 0.05);
+    --table-hover: rgba(255, 255, 255, 0.075);
+    
+    /* Alerts and notifications */
+    --alert-bg: #2d2d2d;
+    --alert-border: #404040;
+    
+    /* Dropdown */
+    --dropdown-bg: #2d2d2d;
+    --dropdown-text: #e1e1e1;
+    --dropdown-hover: #383838;
+    --dropdown-border: rgba(255, 255, 255, 0.15);
+}
+
+/* Apply theme variables to components */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Navbar styles */
+.navbar {
+    background-color: var(--navbar-bg) !important;
+    border-bottom: 1px solid var(--card-border);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: var(--navbar-text);
+    transition: color 0.3s ease;
+}
+
+/* Card styles */
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-bottom-color: var(--card-border);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Dark mode specific card header background */
+:root[data-theme="dark"] .card-header {
+    background-color: #383838;
+}
+
+.card-header h5 {
+    color: var(--text-color);
+    transition: color 0.3s ease;
+}
+
+/* Ensure card titles are visible in dark mode */
+:root[data-theme="dark"] .card-header h5,
+:root[data-theme="dark"] .card-title {
+    color: #ffffff !important;
+}
+
+/* Form controls */
+.form-control {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.form-control:focus {
+    background-color: var(--input-bg);
+    border-color: var(--btn-primary-bg);
+    color: var(--input-text);
+}
+
+/* Tables */
+.table {
+    color: var(--text-color);
+    border-color: var(--table-border);
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--table-stripe);
+    transition: background-color 0.3s ease;
+}
+
+.table-hover tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+/* Dropdown menus */
+.dropdown-menu {
+    background-color: var(--dropdown-bg);
+    border-color: var(--dropdown-border);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.dropdown-item {
+    color: var(--dropdown-text);
+    transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--dropdown-hover);
+    color: var(--dropdown-text);
+}
+
+/* Alert styles */
+.alert {
+    background-color: var(--alert-bg);
+    border-color: var(--alert-border);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Theme toggle button styles */
+.theme-toggle {
+    background: none;
+    border: none;
+    padding: 0 10px;
+    color: var(--navbar-text);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform 0.3s ease, color 0.3s ease;
+    margin-right: 1rem;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1);
+}
+
+.theme-toggle:focus {
+    outline: none;
+}
+
+.theme-toggle i {
+    pointer-events: none;
+}
+
+/* Balance summary specific styles */
+.list-group-item {
+    background-color: var(--list-group-bg);
+    border-color: var(--list-group-border);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.list-group-item-action {
+    color: var(--text-color);
+}
+
+.list-group-item-action:hover,
+.list-group-item-action:focus {
+    background-color: var(--list-group-hover);
+    color: var(--text-hover);
+}
+
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Ensure success and danger colors are visible in dark mode */
+:root[data-theme="dark"] .text-success {
+    color: #00d37f !important;
+}
+
+:root[data-theme="dark"] .text-danger {
+    color: #ff5f57 !important;
+}
+
+/* Make small text more visible in dark mode */
+:root[data-theme="dark"] small {
+    color: var(--text-muted);
+}
+
+/* Balance indicators for both light and dark modes */
+.text-success {
+    color: #2ecc71 !important;
+}
+
+.text-danger {
+    color: #e74c3c !important;
+}
+
+/* Balance indicator icons */
+.text-success i,
+.text-danger i {
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+/* Username in balance list */
+.d-flex span:first-child {
+    color: var(--text-color);
+    transition: color 0.3s ease;
+}
+
+/* Hover effects for balance rows */
+.table-hover tbody tr:hover .text-success {
+    color: #27ae60 !important;
+}
+
+.table-hover tbody tr:hover .text-danger {
+    color: #c0392b !important;
+}
+
+/* :root[data-theme="dark"] .table-hover tbody tr:hover .text-success {
+    color: #00ff9d !important;
+}
+
+:root[data-theme="dark"] .table-hover tbody tr:hover .text-danger {
+    color: #ff7b74 !important;
+} */
+
+/* Make username black in dark mode for details cards */
+:root[data-theme="dark"] .card.border-0 .card-body .d-flex span:first-child {
+    color: #000000 !important;
+}
