@@ -49,10 +49,17 @@ export interface GroupBalance {
   balances: Balance[];
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface ApiResponse<T = any> {
+  status: 'success' | 'error';
+  message?: string;
+  data: T;
+}
+
+export interface CreateGroupResponse {
+  id: number;
+  name: string;
+  members: User[];
+  created_at: string;
 }
 
 export interface PaginatedResponse<T> {

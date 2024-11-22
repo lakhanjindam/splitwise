@@ -4,15 +4,13 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api-client';
+import { useAuth } from '@/contexts/auth-context';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -23,8 +21,8 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const {
     register,
@@ -37,13 +35,13 @@ export function LoginForm() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setIsLoading(true);
-      await api.login(data.username, data.password);
-      router.push('/dashboard');
+      await login(data.username, data.password);
       toast({
         title: 'Success',
         description: 'Successfully logged in!',
       });
     } catch (error) {
+      console.error('Login failed:', error);
       toast({
         title: 'Error',
         description: 'Invalid username or password',

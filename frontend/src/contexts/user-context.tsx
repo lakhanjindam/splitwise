@@ -1,14 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
-import { useRouter } from "next/navigation"
-import api from "@/lib/api-client"
-
-interface User {
-  id: number
-  username: string
-  email: string
-}
+import { useRouter, usePathname } from "next/navigation"
+import { api } from "@/lib/api-client"
+import type { User } from "@/types/schema"
 
 interface UserContextType {
   user: User | null
@@ -18,30 +13,67 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
+// List of paths that don't require authentication
+const publicPaths = ['/', '/auth/login', '/auth/register']
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
-    // Check if user is logged in
+    let ignore = false
+
     const checkAuth = async () => {
+      // Skip auth check for public paths
+      if (publicPaths.includes(pathname)) {
+        setLoading(false)
+        return
+      }
+
       try {
         const response = await api.getCurrentUser()
-        setUser(response.data.user)
+        if (!ignore) {
+          if (response.data?.data) {
+            setUser(response.data.data)
+          } else {
+            setUser(null)
+            if (!publicPaths.includes(pathname)) {
+              router.push("/auth/login")
+            }
+          }
+        }
       } catch (error) {
-        console.error("Auth check failed:", error)
-        router.push("/auth/login")
+        if (!ignore) {
+          console.error("Auth check failed:", error)
+          setUser(null)
+          if (!publicPaths.includes(pathname)) {
+            router.push("/auth/login")
+          }
+        }
       } finally {
-        setLoading(false)
+        if (!ignore) {
+          setLoading(false)
+        }
       }
     }
 
     checkAuth()
-  }, [router])
+
+    return () => {
+      ignore = true
+    }
+  }, [router, pathname])
+
+  const value = {
+    user,
+    setUser,
+    loading
+  }
 
   return (
-    <UserContext.Provider value={{ user, setUser, loading }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   )
@@ -50,7 +82,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 export function useUser() {
   const context = useContext(UserContext)
   if (context === undefined) {
-    throw new Error("useUser must be used within a UserProvider")
+    throw new Error('useUser must be used within a UserProvider')
   }
   return context
 }

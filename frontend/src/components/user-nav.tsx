@@ -35,7 +35,7 @@ function getRandomPastelColor(username: string): string {
 
 export function UserNav() {
   const router = useRouter()
-  const { user, setUser } = useUser()
+  const { user, setUser, loading } = useUser()
 
   const handleLogout = async () => {
     try {
@@ -47,24 +47,23 @@ export function UserNav() {
     }
   }
 
+  if (loading) {
+    return null
+  }
+
   if (!user) {
     return null
   }
 
   const initials = getInitials(user.username)
-  const bgColor = getRandomPastelColor(user.username)
+  const backgroundColor = getRandomPastelColor(user.username)
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          className="relative h-10 w-10 rounded-full ring-1 ring-border hover:ring-primary hover:bg-accent"
-        >
-          <Avatar>
-            <AvatarFallback style={{ backgroundColor: bgColor }}>
-              {initials}
-            </AvatarFallback>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback style={{ backgroundColor }}>{initials}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -79,11 +78,16 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
+          <DropdownMenuItem>
+            <User className="mr-2 h-4 w-4" />
+            <span>Profile</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log out</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

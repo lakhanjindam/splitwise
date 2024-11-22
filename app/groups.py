@@ -10,14 +10,28 @@ groups = Blueprint('groups', __name__)
 @login_required
 def create_group():
     if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-        currency = request.form.get('currency', 'USD')
+        if request.is_json:
+            data = request.get_json()
+            name = data.get('name')
+            currency = data.get('currency', 'USD')
+            member_ids = data.get('members', [])
+        else:
+            name = request.form.get('name')
+            currency = request.form.get('currency', 'USD')
+            member_ids = []
+        
+        if not name:
+            if request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Name is required'
+                }), 400
+            flash('Group name is required', 'error')
+            return redirect(url_for('groups.create_group'))
         
         # Create new group
         group = Group(
             name=name,
-            description=description,
             currency=currency,
             created_by_id=current_user.id
         )
@@ -25,9 +39,30 @@ def create_group():
         # Add the creator as the first member
         group.members.append(current_user)
         
+        # Add selected members
+        if member_ids:
+            members = User.query.filter(User.id.in_(member_ids)).all()
+            for member in members:
+                if member != current_user and member not in group.members:
+                    group.members.append(member)
+        
         db.session.add(group)
         db.session.commit()
         
+        if request.is_json:
+            return jsonify({
+                'status': 'success',
+                'data': {
+                    'id': group.id,
+                    'name': group.name,
+                    'currency': group.currency,
+                    'members': [{
+                        'id': member.id,
+                        'username': member.username
+                    } for member in group.members]
+                }
+            })
+            
         flash('Group created successfully!', 'success')
         return redirect(url_for('groups.view_group', group_id=group.id))
     
@@ -164,3 +199,16 @@ def search_users():
         'id': user.id,
         'username': user.username
     } for user in users])
+
+@groups.route('/api/users')
+@login_required
+def get_users():
+    users = User.query.all()
+    return jsonify({
+        'status': 'success',
+        'data': [{
+            'id': user.id,
+            'username': user.username,
+            'email': user.email
+        } for user in users]
+    })
