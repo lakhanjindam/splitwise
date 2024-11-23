@@ -14,7 +14,8 @@ import { useRouter } from "next/navigation"
 import { useUser } from "@/contexts/user-context"
 import api from "@/lib/api-client"
 
-function getInitials(name: string): string {
+function getInitials(name: string | undefined): string {
+  if (!name) return '';
   return name
     .split(" ")
     .map((n) => n[0])
@@ -22,7 +23,8 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
-function getRandomPastelColor(username: string): string {
+function getRandomPastelColor(username: string | undefined): string {
+  if (!username) return 'hsl(0, 0%, 80%)';
   let hash = 0;
   for (let i = 0; i < username.length; i++) {
     hash = username.charCodeAt(i) + ((hash << 5) - hash);

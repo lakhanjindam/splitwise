@@ -7,13 +7,20 @@ export interface User {
 export interface Group {
   id: number;
   name: string;
-  description?: string;
-  created_by_id: number;
   currency: string;
-  members: User[];
-  creator: User;
-  total_expenses?: number;
-  member_count?: number;
+  created_by: {
+    id: number;
+    username: string;
+  };
+  members: {
+    id: number;
+    username: string;
+    email: string;
+  }[];
+  total_expenses: number;
+  member_count: number;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface Expense {
@@ -39,6 +46,12 @@ export interface ExpenseSplit {
 }
 
 export interface Balance {
+  totalOwed: number;
+  totalOwes: number;
+  netBalance: number;
+}
+
+export interface UserBalance {
   user_id: number;
   amount: number;
   user?: User;
@@ -46,13 +59,16 @@ export interface Balance {
 
 export interface GroupBalance {
   group_id: number;
-  balances: Balance[];
+  balances: UserBalance[];
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T> {
   status: 'success' | 'error';
   message?: string;
-  data: T;
+  data?: {
+    user?: User;
+    [key: string]: any;
+  };
 }
 
 export interface CreateGroupResponse {

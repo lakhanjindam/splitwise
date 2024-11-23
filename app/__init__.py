@@ -14,7 +14,8 @@ def create_app(config_class=Config):
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
             "expose_headers": ["Content-Type", "X-CSRF-Token"],
-            "supports_credentials": True
+            "supports_credentials": True,
+            "send_wildcard": False
         }
     })
     
@@ -25,6 +26,27 @@ def create_app(config_class=Config):
     
     # Import models to ensure they are registered with SQLAlchemy
     from . import models
+    
+    with app.app_context():
+        # Enable foreign key support for SQLite
+        if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+            def _fk_pragma_on_connect(dbapi_con, con_record):
+                dbapi_con.execute('pragma foreign_keys=ON')
+            
+            from sqlalchemy import event, text
+            event.listen(db.engine, 'connect', _fk_pragma_on_connect)
+            
+            # Ensure foreign keys are enabled for the current connection
+            db.session.execute(text('PRAGMA foreign_keys=ON'))
+            db.session.commit()
+        
+        # Create or upgrade database
+        db.create_all()
+        try:
+            # Only try to update timestamps if the columns exist
+            models.update_existing_timestamps()
+        except Exception as e:
+            print(f"Note: Could not update timestamps: {e}")
     
     # Configure login manager
     @login_manager.user_loader
@@ -41,13 +63,13 @@ def create_app(config_class=Config):
     
     # Register blueprints
     from .auth import auth as auth_blueprint
-    app.register_blueprint(auth_blueprint)
+    app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
     
     from .groups import groups as groups_blueprint
-    app.register_blueprint(groups_blueprint)
+    app.register_blueprint(groups_blueprint, url_prefix='/api/groups')
     
     from .expenses import expenses as expenses_blueprint
-    app.register_blueprint(expenses_blueprint)
+    app.register_blueprint(expenses_blueprint, url_prefix='/api/expenses')
     
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)

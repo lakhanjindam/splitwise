@@ -37,8 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const response = await api.getCurrentUser();
         if (!ignore) {
-          if (response.data?.data) {
-            setUser(response.data.data);
+          if (response.data?.status === 'success' && response.data?.data?.user) {
+            setUser(response.data.data.user);
           } else {
             setUser(null);
             if (!publicPaths.includes(pathname)) {
@@ -72,14 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const response = await api.login(username, password);
-      if (response.data?.data) {
-        setUser(response.data.data);
+      if (response.data?.status === 'success' && response.data?.data?.user) {
+        setUser(response.data.data.user);
         router.push('/dashboard');
       } else {
-        throw new Error('Login failed');
+        throw new Error(response.data?.message || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login failed:', error);
       throw error;
     } finally {
       setIsLoading(false);

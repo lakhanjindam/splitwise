@@ -1,71 +1,112 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from .models import db, Expense, ExpenseSplit, Group, User
 from datetime import datetime
-from flask_wtf.csrf import validate_csrf
+from sqlalchemy.exc import SQLAlchemyError
 
-expenses = Blueprint('expenses', __name__)
+# Create expenses blueprint
+expenses = Blueprint('expenses', __name__, url_prefix='/api/expenses')
 
-@expenses.route('/group/<int:group_id>/add_expense', methods=['GET', 'POST'])
+@expenses.route('/group/<int:group_id>', methods=['POST'])
 @login_required
 def add_expense(group_id):
-    group = Group.query.get_or_404(group_id)
-    
-    # Check if user is member of the group
-    if current_user not in group.members:
-        flash('You are not a member of this group.', 'danger')
-        return redirect(url_for('main.dashboard'))
-    
-    if request.method == 'POST':
-        try:
-            description = request.form.get('description')
-            amount = float(request.form.get('amount'))
-            
-            # Create new expense with group's currency
-            expense = Expense(
-                description=description,
-                amount=amount,
-                currency=group.currency,  # Use group's currency
-                payer_id=current_user.id,
-                group_id=group.id
-            )
-            db.session.add(expense)
-            
-            # Get selected members for split
-            selected_members = request.form.getlist('split_with')
-            if not selected_members:
-                flash('Please select at least one member to split with.', 'danger')
-                return redirect(url_for('expenses.add_expense', group_id=group_id))
-            
-            # Always include the payer in the split
-            if str(current_user.id) not in selected_members:
-                selected_members.append(str(current_user.id))
-            
-            # Calculate split amount
-            split_amount = amount / len(selected_members)
-            
-            # Create splits
-            for member_id in selected_members:
-                member = User.query.get(member_id)
-                if member in group.members:  # Verify member is in group
-                    split = ExpenseSplit(
-                        expense=expense,
-                        user_id=member_id,
-                        amount=split_amount
-                    )
-                    db.session.add(split)
-            
-            db.session.commit()
-            flash('Expense added successfully!', 'success')
-            return redirect(url_for('groups.view_group', group_id=group_id))
-            
-        except (ValueError, ZeroDivisionError):
-            flash('Invalid amount or no members selected.', 'danger')
-            return redirect(url_for('expenses.add_expense', group_id=group_id))
-    
-    return render_template('add_expense.html', group=group)
+    try:
+        # Get group and verify membership
+        group = Group.query.get_or_404(group_id)
+        if current_user not in group.members:
+            return jsonify({'error': 'You are not a member of this group'}), 403
 
-@expenses.route('/expense/<int:expense_id>/delete', methods=['POST'])
+        # Parse request data
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # Validate required fields
+        description = data.get('description')
+        amount = data.get('amount')
+        split_with = data.get('split_with', [])
+
+        if not description or not isinstance(description, str):
+            return jsonify({'error': 'Description is required'}), 400
+
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                return jsonify({'error': 'Amount must be greater than 0'}), 400
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid amount'}), 400
+
+        if not split_with or not isinstance(split_with, list):
+            return jsonify({'error': 'At least one member must be selected for splitting'}), 400
+
+        # Create expense
+        expense = Expense(
+            description=description,
+            amount=amount,
+            currency=group.currency,
+            payer_id=current_user.id,
+            group_id=group_id,
+            date=datetime.utcnow()
+        )
+        db.session.add(expense)
+        db.session.flush()  # Get the expense ID without committing
+
+        # Calculate split amount (including the payer)
+        total_members = len(split_with) + 1  # +1 for the payer
+        split_amount = round(amount / total_members, 2)
+
+        # Create split for the payer
+        payer_split = ExpenseSplit(
+            expense_id=expense.id,
+            user_id=current_user.id,
+            amount=split_amount,
+            is_settled=True  # Payer's split is automatically settled
+        )
+        db.session.add(payer_split)
+
+        # Create splits for other members
+        for member_id in split_with:
+            # Verify member exists and is in the group
+            member = User.query.get(member_id)
+            if not member or member not in group.members:
+                db.session.rollback()
+                return jsonify({'error': f'Invalid member ID: {member_id}'}), 400
+
+            split = ExpenseSplit(
+                expense_id=expense.id,
+                user_id=member_id,
+                amount=split_amount,
+                is_settled=False
+            )
+            db.session.add(split)
+
+        # Commit all changes
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Expense created successfully',
+            'expense': {
+                'id': expense.id,
+                'description': expense.description,
+                'amount': expense.amount,
+                'currency': expense.currency,
+                'date': expense.date.isoformat(),
+                'splits': [{
+                    'user_id': split.user_id,
+                    'amount': split.amount,
+                    'is_settled': split.is_settled
+                } for split in expense.splits]
+            }
+        }), 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'error': 'Database error occurred'}), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@expenses.route('/<int:expense_id>', methods=['DELETE'])
 @login_required
 def delete_expense(expense_id):
     try:
@@ -95,7 +136,7 @@ def delete_expense(expense_id):
     flash('Expense has been deleted.', 'success')
     return redirect(url_for('groups.view_group', group_id=group_id))
 
-@expenses.route('/expense/<int:expense_id>/settle', methods=['POST'])
+@expenses.route('/<int:expense_id>/settle', methods=['POST'])
 @login_required
 def settle_expense(expense_id):
     try:
@@ -143,7 +184,7 @@ def settle_expense(expense_id):
     flash(f'You settled {expense.get_currency_symbol()}{split_amount:.2f} with {expense.payer.username}!', 'success')
     return redirect(url_for('groups.view_group', group_id=expense.group_id))
 
-@expenses.route('/expense/view/<int:expense_id>')
+@expenses.route('/<int:expense_id>', methods=['GET'])
 @login_required
 def view_expense(expense_id):
     expense = Expense.query.get_or_404(expense_id)
@@ -155,7 +196,7 @@ def view_expense(expense_id):
     
     return render_template('view_expense.html', expense=expense)
 
-@expenses.route('/expense/<int:expense_id>/update-splits', methods=['POST'])
+@expenses.route('/<int:expense_id>/splits', methods=['PUT'])
 @login_required
 def update_splits(expense_id):
     try:

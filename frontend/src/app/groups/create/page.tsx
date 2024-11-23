@@ -65,17 +65,20 @@ export default function CreateGroupPage() {
     const fetchUsers = async () => {
       try {
         const response = await api.getUsers();
+        console.log('Users response:', response.data);
         if (response.data.status === 'success' && response.data.data) {
-          setUsers(response.data.data);
+          const usersList = response.data.data.users || [];
+          console.log('Setting users:', usersList);
+          setUsers(usersList);
         } else {
           throw new Error('Failed to fetch users');
         }
       } catch (error) {
         console.error('Failed to fetch users:', error);
         toast({
-          title: "Error",
-          description: "Failed to fetch users. Please try again.",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Failed to fetch users. Please try again.',
+          variant: 'destructive',
         });
       }
     };
@@ -83,13 +86,13 @@ export default function CreateGroupPage() {
     fetchUsers();
   }, [toast]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const response = await api.createGroup({
         name: values.name,
         currency: values.currency,
-        members: values.members
+        members: values.members,
       });
 
       if (response.data.status === 'success' && response.data.data) {
@@ -97,21 +100,21 @@ export default function CreateGroupPage() {
           title: "Success",
           description: "Group created successfully!",
         });
-        router.push(`/group/${response.data.data.id}`);
+        router.push(`/groups/${response.data.data.id}`);
       } else {
-        throw new Error(response.data.message || 'Failed to create group');
+        throw new Error('Failed to create group');
       }
     } catch (error) {
       console.error('Failed to create group:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create group. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create group",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="container max-w-2xl py-10">

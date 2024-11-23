@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { ThemeToggle } from '@/components/theme-toggle'
-import { useThemeMount } from "@/hooks/theme-mount";
+import { useThemeMount } from "@/hooks/theme-mount"
+import { createExpense } from '@/lib/api/expenses'
+import { useRouter } from 'next/navigation'
 
 interface Expense {
   id: number;
@@ -47,7 +49,6 @@ const currencies = [
   { label: 'NZD', symbol: 'NZ$' }, // New Zealand Dollar
 ];
 
-
 const users = [
   { label: 'Alice', value: 'alice' },
   { label: 'Bob', value: 'bob' },
@@ -57,14 +58,17 @@ const users = [
 ]
 
 export default function ExpensePage() {
+  const router = useRouter()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [paidBy, setPaidBy] = useState('')
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   
-  const { isMounted, currentTheme } = useThemeMount(); // Use the custom hook
+  const { isMounted, currentTheme } = useThemeMount();
 
   if (!isMounted) return null;
 
@@ -72,21 +76,35 @@ export default function ExpensePage() {
     ? 'bg-gradient-to-r from-[#FFDAB9] via-[#87CEEB] to-[#E6E6FA]'
     : 'bg-gradient-to-r from-[#FF6B6B] via-[#4ECDC4] to-[#45B7D1]'
   
-    const handleAddExpense = () => {
-    if (description && amount && currency && paidBy) {
-      const newExpense: Expense = {
-        id: Date.now(),
+  const handleAddExpense = async () => {
+    if (!description || !amount || !currency || !paidBy) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      
+      // For now, we'll use a default group ID. In a real app, you'd get this from the route or props
+      const groupId = '1';
+      await createExpense(groupId, {
         description,
         amount: parseFloat(amount),
-        currency,
-        dateCreated: Date.now(),
-        paidBy,
-      }
-      setExpenses((prevExpenses) => [...prevExpenses, newExpense])
-      setDescription('')
-      setAmount('')
-      setCurrency('USD')
-      setPaidBy('')
+        split_with: [1, 2], // For now, we'll split with default users. In a real app, you'd select users
+      });
+
+      // Clear form and refresh the page
+      setDescription('');
+      setAmount('');
+      setCurrency('USD');
+      setPaidBy('');
+      router.refresh();
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create expense');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -116,6 +134,11 @@ export default function ExpensePage() {
             <CardDescription>Enter the details of your new expense</CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="bg-red-50 text-red-500 p-3 rounded-md mb-4">
+                {error}
+              </div>
+            )}
             <div className="grid gap-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="description" className="text-right">
@@ -209,8 +232,9 @@ export default function ExpensePage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={handleAddExpense}>
-              <Plus className="mr-2 h-4 w-4" /> Add Expense
+            <Button onClick={handleAddExpense} disabled={submitting}>
+              <Plus className="mr-2 h-4 w-4" />
+              {submitting ? 'Adding...' : 'Add Expense'}
             </Button>
           </CardFooter>
         </div>

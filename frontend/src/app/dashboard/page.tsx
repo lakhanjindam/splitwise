@@ -4,28 +4,20 @@ import { useEffect, useState } from 'react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserNav } from "@/components/user-nav"
-import axios from 'axios'
 import Link from "next/link"
 import { Plus } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useUser } from "@/contexts/user-context"
-
-interface Group {
-  id: number
-  name: string
-  memberCount: number
-}
-
-interface Balance {
-  totalOwed: number
-  totalOwes: number
-  netBalance: number
-}
+import { api } from "@/lib/api-client"
+import { useToast } from "@/components/ui/use-toast"
+import type { Group, Balance } from "@/types/schema"
+import { formatCurrency } from "@/lib/utils"
 
 export default function DashboardPage() {
   const { loading: userLoading } = useUser()
+  const { toast } = useToast()
   const [groups, setGroups] = useState<Group[]>([])
   const [balance, setBalance] = useState<Balance>({
     totalOwed: 0,
@@ -38,14 +30,28 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       try {
         // Fetch groups
-        const groupsResponse = await axios.get('/api/groups')
-        setGroups(groupsResponse.data)
+        const groupsResponse = await api.getGroups()
+        if (groupsResponse.data.status === 'success' && groupsResponse.data.data) {
+          setGroups(groupsResponse.data.data.groups || [])
+        }
         
         // Fetch balance
-        const balanceResponse = await axios.get('/api/balance')
-        setBalance(balanceResponse.data)
+        const balanceResponse = await api.getUserBalances()
+        if (balanceResponse.data.status === 'success' && balanceResponse.data.data) {
+          const balanceData = balanceResponse.data.data;
+          setBalance({
+            totalOwed: balanceData.total_owed || 0,
+            totalOwes: balanceData.total_owes || 0,
+            netBalance: balanceData.net_balance || 0
+          })
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch dashboard data. Please try again.',
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
@@ -54,7 +60,7 @@ export default function DashboardPage() {
     if (!userLoading) {
       fetchDashboardData()
     }
-  }, [userLoading])
+  }, [userLoading, toast])
 
   if (loading || userLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -83,15 +89,17 @@ export default function DashboardPage() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
                   <h3 className="font-semibold">Total Balance</h3>
-                  <p className="text-2xl font-bold text-green-600">${balance.netBalance.toFixed(2)}</p>
+                  <p className={`text-2xl font-bold ${balance.netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(balance.netBalance)}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
                   <h3 className="font-semibold">You are owed</h3>
-                  <p className="text-2xl font-bold text-green-600">${balance.totalOwed.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(balance.totalOwed)}</p>
                 </div>
                 <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
                   <h3 className="font-semibold">You owe</h3>
-                  <p className="text-2xl font-bold text-red-600">${balance.totalOwes.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-red-600">{formatCurrency(balance.totalOwes)}</p>
                 </div>
               </div>
             </div>
@@ -107,19 +115,33 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
               </div>
-              <ScrollArea className="h-[300px] rounded-lg border">
-                <div className="p-4">
+              <ScrollArea className="h-[400px] rounded-lg border">
+                <div className="p-4 space-y-4">
                   {groups.length > 0 ? (
                     groups.map((group) => (
                       <Link 
                         key={group.id}
-                        href={`/expense-groups/${group.id}`}
-                        className="mb-4 rounded-lg border bg-card p-4 last:mb-0 block hover:bg-accent transition-colors"
+                        href={`/groups/${group.id}`}
+                        className="rounded-lg border bg-card p-4 block hover:bg-accent transition-colors"
                       >
-                        <div className="space-y-2">
-                          <h3 className="font-semibold">{group.name}</h3>
-                          <div className="text-sm text-muted-foreground">
-                            {group.memberCount} members
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-semibold text-lg">{group.name}</h3>
+                            <div className="text-sm text-muted-foreground">
+                              {group.currency}
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-sm text-muted-foreground">
+                            <div className="flex gap-2">
+                              <span>{group.member_count} members</span>
+                              <span>•</span>
+                              <span>Created by {group.created_by.username}</span>
+                            </div>
+                            {group.total_expenses > 0 && (
+                              <div className="font-medium text-foreground">
+                                Total: {formatCurrency(group.total_expenses, group.currency)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Link>

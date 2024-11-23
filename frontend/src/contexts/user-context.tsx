@@ -35,8 +35,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const response = await api.getCurrentUser()
         if (!ignore) {
-          if (response.data?.data) {
-            setUser(response.data.data)
+          if (response.data?.status === 'success' && response.data?.data?.user) {
+            setUser(response.data.data.user)
           } else {
             setUser(null)
             if (!publicPaths.includes(pathname)) {

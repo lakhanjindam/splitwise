@@ -16,20 +16,23 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     
-    # Groups created by this user
-    created_groups = db.relationship('Group', backref='creator', lazy=True, foreign_keys='Group.created_by_id')
-    
     # Groups this user is a member of (many-to-many)
     groups = db.relationship('Group', 
                            secondary=group_members,
                            lazy='subquery',
                            backref=db.backref('members', lazy=True))
     
+    # Groups created by this user
+    created_groups = db.relationship('Group', 
+                                   backref=db.backref('created_by', lazy=True),
+                                   lazy=True,
+                                   foreign_keys='Group.created_by_id')
+    
     # Expenses paid by this user
     expenses = db.relationship('Expense', backref='payer', lazy=True, foreign_keys='Expense.payer_id')
     
     # Expense splits this user is involved in
-    expense_splits = db.relationship('ExpenseSplit', backref='user', lazy=True)
+    expense_splits = db.relationship('ExpenseSplit', back_populates='user', lazy=True)
 
     __table_args__ = (
         db.UniqueConstraint('username', name='uq_user_username'),
@@ -37,10 +40,16 @@ class User(UserMixin, db.Model):
     )
     
     def set_password(self, password):
+        print(f"Setting password hash for {self.username}")  # Debug line
         self.password_hash = generate_password_hash(password)
+        print(f"Password hash set: {self.password_hash}")  # Debug line
         
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        print(f"Checking password for {self.username}")  # Debug line
+        print(f"Stored hash: {self.password_hash}")  # Debug line
+        result = check_password_hash(self.password_hash, password)
+        print(f"Password check result: {result}")  # Debug line
+        return result
 
     def get_balance_with_user(self, other_user):
         """Calculate the balance between this user and another user"""
@@ -142,20 +151,32 @@ class User(UserMixin, db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+def update_existing_timestamps():
+    groups = Group.query.all()
+    now = datetime.utcnow()
+    for group in groups:
+        if not group.created_at:
+            group.created_at = now
+        if not group.updated_at:
+            group.updated_at = now
+    db.session.commit()
+
 class Group(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), nullable=False)
     description = db.Column(db.String(256))
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_group_creator_id'), nullable=False)
     currency = db.Column(db.String(3), nullable=False, default='USD')
+    created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Group expenses (one-to-many)
+    # Relationships
     expenses = db.relationship('Expense',
                              backref=db.backref('group', lazy=True),
                              cascade='all, delete-orphan')
     
-    # Note: 'members' relationship is defined through backref in User.groups
-    # Note: 'creator' relationship is defined through backref in User.created_groups
+    # Note: created_by relationship is defined in User model
+    # Note: members relationship is defined through backref in User.groups
 
     def get_recent_expenses(self, limit=5):
         """Get recent expenses for this group"""
@@ -246,17 +267,31 @@ class Group(db.Model):
         return currency_symbols.get(self.currency, self.currency)
 
 class Expense(db.Model):
+    __tablename__ = 'expense'
+    
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=False)
-    payer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    group_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('group.id', ondelete='CASCADE'),
+        nullable=False
+    )
+    payer_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('user.id', ondelete='CASCADE'),
+        nullable=False
+    )
     currency = db.Column(db.String(3), nullable=False, default='USD')
     
     # Relationships
-    splits = db.relationship('ExpenseSplit', back_populates='expense', cascade='all, delete-orphan')
-
+    splits = db.relationship(
+        'ExpenseSplit',
+        back_populates='expense',
+        cascade='all, delete-orphan'
+    )
+    
     def get_currency_symbol(self):
         """Return the currency symbol based on currency code"""
         symbols = {
@@ -269,41 +304,50 @@ class Expense(db.Model):
         return symbols.get(self.currency, self.currency)
 
 class ExpenseSplit(db.Model):
+    __tablename__ = 'expense_split'
+    
     id = db.Column(db.Integer, primary_key=True)
-    expense_id = db.Column(db.Integer, db.ForeignKey('expense.id', name='fk_expensesplit_expense_id', ondelete='CASCADE'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_expensesplit_user_id', ondelete='CASCADE'), nullable=False)
+    expense_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('expense.id', ondelete='CASCADE'),
+        nullable=False
+    )
+    user_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('user.id', ondelete='CASCADE'),
+        nullable=False
+    )
     amount = db.Column(db.Float, nullable=False)
     is_settled = db.Column(db.Boolean, default=False)
     settled_at = db.Column(db.DateTime)
-
+    
     # Relationships
-    expense = db.relationship('Expense', back_populates='splits')
-    # user relationship is handled by backref in User.expense_splits
-
-    __table_args__ = (
-        db.ForeignKeyConstraint(
-            ['expense_id'], ['expense.id'],
-            name='fk_expensesplit_expense_id',
-            ondelete='CASCADE'
-        ),
-        db.ForeignKeyConstraint(
-            ['user_id'], ['user.id'],
-            name='fk_expensesplit_user_id',
-            ondelete='CASCADE'
-        ),
+    expense = db.relationship(
+        'Expense',
+        back_populates='splits',
+        foreign_keys=[expense_id]
     )
-
+    user = db.relationship(
+        'User',
+        back_populates='expense_splits',
+        foreign_keys=[user_id]
+    )
+    
+    __table_args__ = (
+        db.Index('ix_expense_split_expense_id', 'expense_id'),
+        db.Index('ix_expense_split_user_id', 'user_id'),
+        db.CheckConstraint('amount >= 0', name='ck_expense_split_amount_positive'),
+    )
+    
     def __repr__(self):
-        return f'<ExpenseSplit {self.id} User:{self.user_id} Amount:{self.amount}>'
-
+        return f'<ExpenseSplit {self.id} - User {self.user_id} - Amount {self.amount}>'
+    
     def settle(self):
         """Mark this split as settled"""
         self.is_settled = True
         self.settled_at = datetime.utcnow()
-        db.session.commit()
-
-    def unsettled(self):
+        
+    def unsettle(self):
         """Mark this split as unsettled"""
         self.is_settled = False
         self.settled_at = None
-        db.session.commit()

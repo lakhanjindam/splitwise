@@ -4,9 +4,9 @@ from .models import Group, User, db, Expense, ExpenseSplit, group_members
 from flask_wtf.csrf import validate_csrf
 
 # Create groups blueprint
-groups = Blueprint('groups', __name__)
+groups = Blueprint('groups', __name__, url_prefix='/api/groups')
 
-@groups.route('/group/create', methods=['GET', 'POST'])
+@groups.route('/create', methods=['GET', 'POST'])
 @login_required
 def create_group():
     if request.method == 'POST':
@@ -68,25 +68,81 @@ def create_group():
     
     return render_template('create_group.html')
 
-@groups.route('/group/<int:group_id>')
+@groups.route('/<int:group_id>', methods=['GET'])
 @login_required
 def view_group(group_id):
     group = Group.query.get_or_404(group_id)
     
     # Check if user is a member of the group
     if current_user not in group.members:
-        flash('You are not a member of this group.', 'danger')
-        return redirect(url_for('main.dashboard'))
+        return jsonify({
+            'status': 'error',
+            'message': 'You are not a member of this group.'
+        }), 403
     
-    expenses = group.expenses
-    balances = group.get_member_balances()
+    # Get group expenses
+    expenses = [{
+        'id': expense.id,
+        'description': expense.description,
+        'amount': expense.amount,
+        'date': expense.date.isoformat() if expense.date else None,
+        'group_id': expense.group_id,
+        'payer_id': expense.payer_id,
+        'currency': expense.currency,
+        'payer': {
+            'id': expense.payer.id,
+            'username': expense.payer.username,
+            'email': expense.payer.email
+        } if expense.payer else None,
+        'splits': [{
+            'id': split.id,
+            'expense_id': split.expense_id,
+            'user_id': split.user_id,
+            'amount': split.amount,
+            'is_settled': split.is_settled,
+            'settled_at': split.settled_at.isoformat() if split.settled_at else None,
+            'user': {
+                'id': split.user.id,
+                'username': split.user.username,
+                'email': split.user.email
+            } if split.user else None
+        } for split in expense.splits]
+    } for expense in group.expenses]
     
-    return render_template('group_details.html',
-                         group=group,
-                         expenses=expenses,
-                         balances=balances)
+    # Calculate member balances
+    balances = {}
+    for member in group.members:
+        # Amount member has paid
+        paid = sum(e.amount for e in group.expenses if e.payer_id == member.id)
+        # Amount member owes
+        owes = sum(s.amount for e in group.expenses for s in e.splits if s.user_id == member.id)
+        balances[member.id] = paid - owes
+    
+    return jsonify({
+        'status': 'success',
+        'group': {
+            'id': group.id,
+            'name': group.name,
+            'currency': group.currency,
+            'created_by': {
+                'id': group.created_by.id,
+                'username': group.created_by.username
+            },
+            'members': [{
+                'id': member.id,
+                'username': member.username,
+                'email': member.email
+            } for member in group.members],
+            'total_expenses': sum(e.amount for e in group.expenses),
+            'member_count': len(group.members),
+            'created_at': group.created_at.isoformat() if group.created_at else None,
+            'updated_at': group.updated_at.isoformat() if group.updated_at else None
+        },
+        'expenses': expenses,
+        'balances': balances
+    })
 
-@groups.route('/group/<int:group_id>/add_member', methods=['POST'])
+@groups.route('/<int:group_id>/members', methods=['POST'])
 @login_required
 def add_member(group_id):
     try:
@@ -126,7 +182,7 @@ def add_member(group_id):
         }
     })
 
-@groups.route('/group/<int:group_id>/update_name', methods=['POST'])
+@groups.route('/<int:group_id>/name', methods=['PUT'])
 @login_required
 def update_group_name(group_id):
     if not request.is_json:
@@ -154,7 +210,7 @@ def update_group_name(group_id):
     
     return jsonify({'success': True})
 
-@groups.route('/group/<int:group_id>/delete', methods=['POST'])
+@groups.route('/<int:group_id>', methods=['DELETE'])
 @login_required
 def delete_group(group_id):
     try:
@@ -187,7 +243,37 @@ def delete_group(group_id):
     flash('Group has been deleted successfully.', 'success')
     return redirect(url_for('main.dashboard'))
 
-@groups.route('/search_users')
+@groups.route('/', methods=['GET'])
+@login_required
+def get_groups():
+    # Get all groups where the current user is a member
+    user_groups = current_user.groups
+    
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'groups': [{
+                'id': group.id,
+                'name': group.name,
+                'currency': group.currency,
+                'created_by': {
+                    'id': group.created_by.id if group.created_by else None,
+                    'username': group.created_by.username if group.created_by else 'Unknown'
+                },
+                'members': [{
+                    'id': member.id,
+                    'username': member.username,
+                    'email': member.email
+                } for member in group.members],
+                'total_expenses': sum(expense.amount for expense in group.expenses),
+                'member_count': len(group.members),
+                'created_at': group.created_at.isoformat() if group.created_at else None,
+                'updated_at': group.updated_at.isoformat() if group.updated_at else None
+            } for group in user_groups]
+        }
+    })
+
+@groups.route('/users/search', methods=['GET'])
 @login_required
 def search_users():
     query = request.args.get('q', '')
@@ -200,15 +286,17 @@ def search_users():
         'username': user.username
     } for user in users])
 
-@groups.route('/api/users')
+@groups.route('/users', methods=['GET'])
 @login_required
 def get_users():
     users = User.query.all()
     return jsonify({
         'status': 'success',
-        'data': [{
-            'id': user.id,
-            'username': user.username,
-            'email': user.email
-        } for user in users]
+        'data': {
+            'users': [{
+                'id': user.id,
+                'username': user.username,
+                'email': user.email
+            } for user in users]
+        }
     })

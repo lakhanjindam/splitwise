@@ -12,6 +12,9 @@ class Config:
         'sqlite:///' + os.path.join(basedir, 'instance', 'splitwise.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {
+            'check_same_thread': False,  # Only needed for SQLite
+        },
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
