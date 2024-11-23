@@ -78,6 +78,14 @@ export interface CreateGroupResponse {
   created_at: string;
 }
 
+export interface GroupResponse {
+  status: 'success' | 'error';
+  message?: string;
+  group: Group;
+  expenses: Expense[];
+  balances: Record<string, number>;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
