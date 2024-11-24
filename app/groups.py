@@ -142,45 +142,110 @@ def view_group(group_id):
         'balances': balances
     })
 
-@groups.route('/<int:group_id>/members', methods=['POST'])
+@groups.route('/<int:group_id>/members', methods=['GET', 'POST', 'PUT'])
 @login_required
-def add_member(group_id):
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except:
-        flash('Invalid CSRF token. Please try again.', 'danger')
-        return redirect(url_for('groups.view_group', group_id=group_id))
-
+def manage_group_members(group_id):
     group = Group.query.get_or_404(group_id)
     
-    # Check if current user is the group creator
-    if current_user.id != group.created_by_id:
-        return jsonify({'error': 'Only group admin can add members'}), 403
+    if request.method == 'GET':
+        # Check if user is a member of the group
+        if current_user not in group.members:
+            return jsonify({
+                'status': 'error',
+                'message': 'You are not a member of this group.'
+            }), 403
+        
+        members = [{
+            'id': member.id,
+            'username': member.username,
+            'email': member.email
+        } for member in group.members]
+        
+        return jsonify({
+            'status': 'success',
+            'members': members
+        })
     
-    data = request.get_json()
-    if not data or 'user_id' not in data:
-        return jsonify({'error': 'No user specified'}), 400
+    elif request.method == 'PUT':
+        # Check if current user is the group creator
+        if current_user.id != group.created_by_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Only group admin can update members'
+            }), 403
+        
+        data = request.get_json()
+        if not data or 'member_ids' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No member IDs specified'
+            }), 400
+        
+        member_ids = data['member_ids']
+        
+        # Get all users by their IDs
+        users = User.query.filter(User.id.in_(member_ids)).all()
+        found_ids = [user.id for user in users]
+        
+        # Check if all requested users exist
+        missing_ids = set(member_ids) - set(found_ids)
+        if missing_ids:
+            return jsonify({
+                'status': 'error',
+                'message': f'Users not found: {", ".join(map(str, missing_ids))}'
+            }), 404
+        
+        # Update group members
+        group.members = users
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Group members updated successfully'
+        })
     
-    user_id = data['user_id']
-    user = User.query.get(user_id)
-    
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    if user in group.members:
-        return jsonify({'error': 'User is already a member of this group'}), 400
-    
-    # Add user to group
-    group.members.append(user)
-    db.session.commit()
-    
-    return jsonify({
-        'message': 'Member added successfully',
-        'user': {
-            'id': user.id,
-            'username': user.username
-        }
-    })
+    else:  # POST method
+        # Check if current user is the group creator
+        if current_user.id != group.created_by_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Only group admin can add members'
+            }), 403
+        
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No user specified'
+            }), 400
+        
+        user_id = data['user_id']
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'User not found'
+            }), 404
+        
+        if user in group.members:
+            return jsonify({
+                'status': 'error',
+                'message': 'User is already a member of this group'
+            }), 400
+        
+        # Add user to group
+        group.members.append(user)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Member added successfully',
+            'user': {
+                'id': user.id,
+                'username': user.username
+            }
+        })
 
 @groups.route('/<int:group_id>/name', methods=['PUT'])
 @login_required

@@ -86,6 +86,12 @@ export interface GroupResponse {
   balances: Record<string, number>;
 }
 
+export interface GroupMembersResponse {
+  status: 'success' | 'error';
+  message?: string;
+  members: User[];
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

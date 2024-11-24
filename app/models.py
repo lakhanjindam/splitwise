@@ -216,32 +216,25 @@ class Group(db.Model):
         # Calculate balances from all expenses
         for expense in self.expenses:
             payer_id = expense.payer_id
-            # Split amount equally among all members (including payer)
-            num_splits = len(expense.splits)
             
-            if num_splits == 0:
-                continue
-                
-            split_amount = expense.amount / num_splits
-            
-            # For each split, calculate the balance changes
+            # For each split in the expense
             for split in expense.splits:
                 user_id = split.user_id
                 
+                # Skip if it's somehow the payer (shouldn't happen with new logic)
                 if user_id == payer_id:
-                    # Skip adding to owes/owed for payer's own share
                     continue
                 
                 # Only add to balances if not settled
                 if not split.is_settled:
                     # Add to what this person owes
-                    balances[user_id]['owes'] += split_amount
+                    balances[user_id]['owes'] += split.amount
                     # Add to what payer is owed
-                    balances[payer_id]['owed'] += split_amount
+                    balances[payer_id]['owed'] += split.amount
                     
                     # Update the detailed breakdown
-                    balances[user_id]['details'][payer_id] -= split_amount  # User owes payer
-                    balances[payer_id]['details'][user_id] += split_amount  # Payer is owed by user
+                    balances[user_id]['details'][payer_id] -= split.amount  # User owes payer
+                    balances[payer_id]['details'][user_id] += split.amount  # Payer is owed by user
 
         return balances
 

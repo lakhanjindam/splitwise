@@ -51,20 +51,15 @@ def add_expense(group_id):
         db.session.add(expense)
         db.session.flush()  # Get the expense ID without committing
 
-        # Calculate split amount (including the payer)
-        total_members = len(split_with) + 1  # +1 for the payer
+        # Calculate split amount based only on selected members
+        total_members = len(split_with)  # Don't include payer in count
+        if total_members == 0:
+            db.session.rollback()
+            return jsonify({'error': 'At least one member must be selected for splitting'}), 400
+
         split_amount = round(amount / total_members, 2)
 
-        # Create split for the payer
-        payer_split = ExpenseSplit(
-            expense_id=expense.id,
-            user_id=current_user.id,
-            amount=split_amount,
-            is_settled=True  # Payer's split is automatically settled
-        )
-        db.session.add(payer_split)
-
-        # Create splits for other members
+        # Create splits only for selected members
         for member_id in split_with:
             # Verify member exists and is in the group
             member = User.query.get(member_id)
@@ -110,31 +105,47 @@ def add_expense(group_id):
 @login_required
 def delete_expense(expense_id):
     try:
-        validate_csrf(request.form.get('csrf_token'))
-    except:
-        flash('Invalid CSRF token. Please try again.', 'danger')
-        return redirect(url_for('main.dashboard'))
-
-    expense = Expense.query.get_or_404(expense_id)
-    group = expense.group
-    
-    # Only allow expense creator or group admin to delete
-    if current_user.id != expense.payer_id and current_user.id != group.created_by_id:
-        flash('You are not authorized to delete this expense.', 'danger')
-        return redirect(url_for('groups.view_group', group_id=group.id))
-    
-    # Store group_id before deleting the expense
-    group_id = expense.group_id
-    
-    # Delete all splits associated with the expense
-    ExpenseSplit.query.filter_by(expense_id=expense_id).delete()
-    
-    # Delete the expense
-    db.session.delete(expense)
-    db.session.commit()
-    
-    flash('Expense has been deleted.', 'success')
-    return redirect(url_for('groups.view_group', group_id=group_id))
+        expense = Expense.query.get_or_404(expense_id)
+        group = expense.group
+        
+        # Only allow expense creator or group admin to delete
+        if current_user.id != expense.payer_id and current_user.id != group.created_by_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'You are not authorized to delete this expense.',
+                'data': None
+            }), 403
+        
+        # Store group_id before deleting the expense
+        group_id = expense.group_id
+        
+        # Delete all splits associated with the expense
+        ExpenseSplit.query.filter_by(expense_id=expense_id).delete()
+        
+        # Delete the expense
+        db.session.delete(expense)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Expense has been deleted.',
+            'data': None
+        }), 200
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'Database error occurred',
+            'data': None
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'data': None
+        }), 500
 
 @expenses.route('/<int:expense_id>/settle', methods=['POST'])
 @login_required
