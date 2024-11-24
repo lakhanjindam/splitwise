@@ -279,23 +279,16 @@ def update_group_name(group_id):
 @login_required
 def delete_group(group_id):
     print(f"Delete request received for group {group_id}")
-    print(f"Request type: {request.is_json}")
-    print(f"CSRF token in header: {request.headers.get('X-CSRF-Token')}")
     
-    # Skip CSRF validation for now to debug the issue
     group = Group.query.get_or_404(group_id)
     print(f"Found group: {group.name}")
-    print(f"Current user: {current_user.id}, Group creator: {group.created_by_id}")
     
     # Only group creator can delete the group
     if current_user.id != group.created_by_id:
-        if request.is_json:
-            return jsonify({
-                'status': 'error',
-                'message': 'You are not authorized to delete this group'
-            }), 403
-        flash('You are not authorized to delete this group.', 'danger')
-        return redirect(url_for('groups.view_group', group_id=group_id))
+        return jsonify({
+            'status': 'error',
+            'message': 'You are not authorized to delete this group'
+        }), 403
     
     try:
         print("Starting group deletion process")
@@ -320,25 +313,18 @@ def delete_group(group_id):
         db.session.commit()
         print("Database changes committed")
         
-        if request.is_json:
-            return jsonify({
-                'status': 'success',
-                'message': 'Group has been deleted successfully'
-            })
-        
-        flash('Group has been deleted successfully.', 'success')
-        return redirect(url_for('main.dashboard'))
+        return jsonify({
+            'status': 'success',
+            'message': 'Group has been deleted successfully'
+        })
         
     except Exception as e:
         print(f"Error during deletion: {str(e)}")
         db.session.rollback()
-        if request.is_json:
-            return jsonify({
-                'status': 'error',
-                'message': f'Failed to delete group: {str(e)}'
-            }), 500
-        flash('Failed to delete group.', 'error')
-        return redirect(url_for('groups.view_group', group_id=group_id))
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to delete group: {str(e)}'
+        }), 500
 
 @groups.route('/', methods=['GET'])
 @login_required

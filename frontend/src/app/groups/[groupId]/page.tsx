@@ -233,15 +233,11 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
 
   const handleDeleteGroup = async () => {
     try {
-      const response = await api.deleteGroup(parseInt(params.groupId));
-      if (response.data.status === 'success') {
-        setIsDeleteGroupConfirmOpen(false);
-        toast.success(response.data.message || 'Group deleted successfully');
-        router.replace('/dashboard'); // Use replace instead of push
-      } else {
-        toast.error(response.data.message || 'Failed to delete group');
-        setIsDeleteGroupConfirmOpen(false);
-      }
+      await api.deleteGroup(parseInt(params.groupId));
+      setIsDeleteGroupConfirmOpen(false);
+      toast.success('Group deleted successfully');
+      // Use Next.js router to navigate to the frontend dashboard
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Error deleting group:', error);
       toast.error(error?.response?.data?.message || 'Failed to delete group');
