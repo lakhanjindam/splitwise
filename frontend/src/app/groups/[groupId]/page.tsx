@@ -35,7 +35,7 @@ interface GroupDetailsProps {
 export default function GroupDetailsPage({ params }: GroupDetailsProps) {
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [balances, setBalances] = useState<Record<number, number>>({});
+  // const [balances, setBalances] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -52,6 +52,8 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
   });
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<number | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isDeleteGroupConfirmOpen, setIsDeleteGroupConfirmOpen] = useState(false);
   const router = useRouter();
   const { isMounted } = useThemeMount();
   const { theme } = useTheme();
@@ -84,7 +86,19 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
 
   useEffect(() => {
     fetchGroupDetails();
+    fetchCurrentUser();
   }, [params.groupId]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await api.getCurrentUser();
+      if (response.data.status === 'success' && response.data.data?.user) {
+        setCurrentUser(response.data.data.user);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -217,6 +231,24 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
     setIsDeleteConfirmOpen(true);
   }, []);
 
+  const handleDeleteGroup = async () => {
+    try {
+      const response = await api.deleteGroup(parseInt(params.groupId));
+      if (response.data.status === 'success') {
+        setIsDeleteGroupConfirmOpen(false);
+        toast.success(response.data.message || 'Group deleted successfully');
+        router.replace('/dashboard'); // Use replace instead of push
+      } else {
+        toast.error(response.data.message || 'Failed to delete group');
+        setIsDeleteGroupConfirmOpen(false);
+      }
+    } catch (error: any) {
+      console.error('Error deleting group:', error);
+      toast.error(error?.response?.data?.message || 'Failed to delete group');
+      setIsDeleteGroupConfirmOpen(false);
+    }
+  };
+
   const confirmDeleteExpense = useCallback(async () => {
     try {
       if (!expenseToDelete) {
@@ -313,13 +345,34 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
             </Button>
             <h1 className="text-3xl font-bold">{group.name}</h1>
           </div>
-          <Button 
-            onClick={() => router.push(`/groups/${params.groupId}/expenses/create`)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Expense
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={() => router.push(`/groups/${params.groupId}/expenses/create`)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </Button>
+            {currentUser && group?.created_by?.id === currentUser.id && (
+              <Dialog open={isDeleteGroupConfirmOpen} onOpenChange={setIsDeleteGroupConfirmOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive">Delete Group</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Group</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete this group? This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex justify-end gap-4 mt-4">
+                    <Button variant="outline" onClick={() => setIsDeleteGroupConfirmOpen(false)}>Cancel</Button>
+                    <Button variant="destructive" onClick={handleDeleteGroup}>Delete</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
 
         {/* Group Info Card */}
@@ -416,7 +469,12 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
                       <Avatar>
                         <AvatarFallback>{member.username[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      <span>{member.username}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{member.username}</span>
+                        {group.created_by?.id === member.id && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">Admin</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -9,32 +9,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/contexts/user-context"
 import api from "@/lib/api-client"
+import Avatar from "boring-avatars"
 
-function getInitials(name: string | undefined): string {
-  if (!name) return '';
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-}
-
-function getRandomPastelColor(username: string | undefined): string {
-  if (!username) return 'hsl(0, 0%, 80%)';
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  
-  // Generate pastel color
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 80%)`;
-}
-
+/**
+ * Renders a user navigation menu.
+ *
+ * When the user is logged in, this component renders a dropdown menu that
+ * shows the user's username and email, as well as a "Profile" and "Log out"
+ * menu item. When the user is not logged in, this component renders nothing.
+ *
+ * @returns A user navigation menu element.
+ */
 export function UserNav() {
   const router = useRouter()
   const { user, setUser, loading } = useUser()
@@ -57,16 +45,16 @@ export function UserNav() {
     return null
   }
 
-  const initials = getInitials(user.username)
-  const backgroundColor = getRandomPastelColor(user.username)
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback style={{ backgroundColor }}>{initials}</AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden">
+          <Avatar
+            size={32}
+            name={user.username}
+            variant="beam"
+            colors={["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]}
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
