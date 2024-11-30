@@ -1,11 +1,15 @@
-import { Metadata } from 'next';
-import { RegisterForm } from '@/components/auth/register-form';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Register | SplitEase',
-  description: 'Create your SplitEase account',
-};
+import { RegisterForm } from '@/components/auth/register-form';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function RegisterPage() {
+  const { isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   return <RegisterForm />;
 }

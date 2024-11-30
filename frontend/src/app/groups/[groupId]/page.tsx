@@ -25,6 +25,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface GroupDetailsProps {
   params: {
@@ -168,17 +170,24 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
     const netBalance: Record<number, number> = {};
 
     // Initialize balances for all group members
-    group?.members.forEach(member => {
-      owes[member.id] = {};
-      owed[member.id] = {};
-      netBalance[member.id] = 0;
-    });
+    if (group?.members) {
+      group.members.forEach(member => {
+        owes[member.id] = {};
+        owed[member.id] = {};
+        netBalance[member.id] = 0;
+      });
+    }
+
+    // If no expenses, just return initialized empty balances
+    if (!expenses || expenses.length === 0) {
+      setBalanceSummary({ owes, owed, netBalance });
+      return;
+    }
 
     // Process each expense
     expenses.forEach(expense => {
       const payerId = expense.payer_id;
       const totalParticipants = expense.splits.length;
-      const isPayerIncluded = expense.splits.some(split => split.user_id === payerId);
       
       if (totalParticipants > 0) {
         // Calculate share per participant
@@ -187,9 +196,13 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
         expense.splits.forEach(split => {
           const userId = split.user_id;
 
+          // Skip if this split is already settled
+          if (split.is_settled) {
+            return;
+          }
+
           if (userId === payerId) {
             // If payer is part of split, they're only responsible for their share
-            // Other participants will owe the remaining amount
             netBalance[payerId] = (netBalance[payerId] || 0) - sharePerPerson;
           } else {
             // Non-paying participants owe their share to the payer
@@ -204,12 +217,14 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
           }
         });
 
-        // Add the total amount payer is owed (total expense minus their share if included)
-        const payerOwedAmount = isPayerIncluded 
-          ? expense.amount - sharePerPerson  // If payer is included, they're owed total minus their share
-          : expense.amount;                  // If payer is not included, they're owed the full amount
+        // Calculate how much the payer is owed, excluding settled splits
+        const unsettledSplits = expense.splits.filter(split => !split.is_settled && split.user_id !== payerId);
+        const totalOwed = unsettledSplits.length * sharePerPerson;
         
-        netBalance[payerId] = (netBalance[payerId] || 0) + payerOwedAmount;
+        // Update payer's net balance with only unsettled amounts
+        if (totalOwed > 0) {
+          netBalance[payerId] = (netBalance[payerId] || 0) + totalOwed;
+        }
       }
     });
 
@@ -273,6 +288,18 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
     setExpenseToDelete(null);
   }, []);
 
+  const handleSettleExpense = async (expenseId: number) => {
+    try {
+      await api.settleExpense(expenseId);
+      toast.success('Expense settled successfully');
+      // Refresh group details to update balances
+      await fetchGroupDetails();
+    } catch (error: any) {
+      console.error('Error settling expense:', error);
+      toast.error(error?.response?.data?.message || 'Failed to settle expense');
+    }
+  };
+
   if (!isMounted) return null;
 
   const gradientClass = theme === 'dark'
@@ -299,24 +326,24 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <header className="px-4 lg:px-6 h-14 flex items-center justify-between relative z-10 mb-8">
+    <div className="container mx-auto p-2 sm:p-4">
+      <header className="px-2 sm:px-4 lg:px-6 h-14 flex items-center justify-between relative z-10 mb-4 sm:mb-8">
         <Link className="flex items-center justify-center" href="/">
-          <DollarSign className="h-6 w-6 text-primary" />
-          <span className={`ml-2 text-2xl font-bold ${gradientClass} text-transparent bg-clip-text`}>
+          <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <span className={`ml-2 text-xl sm:text-2xl font-bold ${gradientClass} text-transparent bg-clip-text`}>
             SplitEase
           </span>
         </Link>
-        <nav className="flex items-center gap-4 sm:gap-6">
+        <nav className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle className="relative z-20" />
           <UserNav />
         </nav>
       </header>
 
       {/* Group Details */}
-      <div className="grid gap-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
+      <div className="grid gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={() => router.push('/dashboard')}
@@ -337,24 +364,28 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
               >
                 <path d="m15 18-6-6 6-6"/>
               </svg>
-              Back
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <h1 className="text-3xl font-bold">{group.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">{group.name}</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <Button 
               onClick={() => router.push(`/groups/${params.groupId}/expenses/create`)}
-              className="flex items-center gap-2"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 h-9 px-3 sm:px-4"
             >
               <Plus className="h-4 w-4" />
-              Add Expense
+              <span className="hidden sm:inline">Add Expense</span>
+              <span className="sm:hidden">Expense</span>
             </Button>
             {currentUser && group?.created_by?.id === currentUser.id && (
               <Dialog open={isDeleteGroupConfirmOpen} onOpenChange={setIsDeleteGroupConfirmOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="destructive">Delete Group</Button>
+                  <Button variant="destructive" className="flex-1 sm:flex-none h-9">
+                    <span className="hidden sm:inline">Delete Group</span>
+                    <span className="sm:hidden">Delete</span>
+                  </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="w-[90vw] max-w-md mx-auto">
                   <DialogHeader>
                     <DialogTitle>Delete Group</DialogTitle>
                     <DialogDescription>
@@ -486,167 +517,192 @@ export default function GroupDetailsPage({ params }: GroupDetailsProps) {
             <CardDescription>See who owes what in the group</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {group?.members.map((member) => (
-                <div key={member.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Avatar>
-                        <AvatarFallback>{member.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{member.username}</span>
-                    </div>
-                    {shouldShowBalance(member.id, balanceSummary.netBalance[member.id]) && (
-                      <div className={`font-semibold ${
-                        balanceSummary.netBalance[member.id] > 0 ? 'text-green-600' : balanceSummary.netBalance[member.id] < 0 ? 'text-red-600' : ''
-                      }`}>
-                        {formatCurrency(balanceSummary.netBalance[member.id], group.currency)}
+            {expenses.length === 0 ? (
+              <div className="text-center text-muted-foreground py-4">
+                No expenses yet. Create an expense to see balances.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {group?.members.map((member) => {
+                  const netBalance = balanceSummary.netBalance[member.id] || 0;
+                  const owes = balanceSummary.owes[member.id] || {};
+                  const owed = balanceSummary.owed[member.id] || {};
+                  const hasTransactions = Object.values(owes).some(amount => amount > 0) || 
+                                        Object.values(owed).some(amount => amount > 0);
+
+                  return (
+                    <div key={member.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Avatar>
+                            <AvatarFallback>{member.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{member.username}</span>
+                        </div>
+                        {hasTransactions ? (
+                          <div className={`font-semibold ${
+                            netBalance > 0 ? 'text-green-600 dark:text-green-500' : 
+                            netBalance < 0 ? 'text-red-600 dark:text-red-500' : 'text-muted-foreground'
+                          }`}>
+                            {netBalance === 0 ? 'Settled up' : formatCurrency(netBalance, group.currency)}
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground text-sm">No transactions</div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Show detailed breakdown */}
-                  <div className="mt-2 text-sm space-y-1">
-                    {Object.entries(balanceSummary.owes[member.id] || {}).map(([userId, amount]) => {
-                      const user = group.members.find(m => m.id === parseInt(userId));
-                      return amount > 0 && (
-                        <div key={userId} className="text-red-600">
-                          Owes {user?.username}: {formatCurrency(amount, group.currency)}
+                      
+                      {/* Show detailed breakdown only if there are transactions */}
+                      {hasTransactions && (
+                        <div className="mt-2 text-sm space-y-1">
+                          {Object.entries(owes).map(([userId, amount]) => {
+                            const user = group.members.find(m => m.id === parseInt(userId));
+                            return amount > 0 && (
+                              <div key={userId} className="text-red-600 dark:text-red-500">
+                                Owes {user?.username}: {formatCurrency(amount, group.currency)}
+                              </div>
+                            );
+                          })}
+                          {Object.entries(owed).map(([userId, amount]) => {
+                            const user = group.members.find(m => m.id === parseInt(userId));
+                            return amount > 0 && (
+                              <div key={userId} className="text-green-600 dark:text-green-500">
+                                Owed by {user?.username}: {formatCurrency(amount, group.currency)}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                    {Object.entries(balanceSummary.owed[member.id] || {}).map(([userId, amount]) => {
-                      const user = group.members.find(m => m.id === parseInt(userId));
-                      return amount > 0 && (
-                        <div key={userId} className="text-green-600">
-                          Owed by {user?.username}: {formatCurrency(amount, group.currency)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Expenses List */}
         <Card>
           <CardHeader>
-            <h2 className="text-2xl font-semibold">Recent Expenses</h2>
+            <div className="flex justify-between items-center">
+              <CardTitle>Expenses</CardTitle>
+              <Button 
+                onClick={() => {
+                  if (group?.members.length === 1) {
+                    toast.error('Cannot create an expense', {
+                      description: 'You need at least one other member in the group to create an expense.',
+                      action: {
+                        label: 'Add Members',
+                        onClick: () => router.push(`/groups/${params.groupId}/members`)
+                      }
+                    });
+                    return;
+                  }
+                  router.push(`/groups/${params.groupId}/expenses/create`);
+                }}
+                className="flex items-center gap-2 h-9 px-3 sm:px-4"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add Expense</span>
+                <span className="sm:hidden">Expense</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {expenses.length === 0 ? (
-              <p className="text-center text-gray-500">No expenses yet</p>
-            ) : (
-              <div className="grid gap-4">
-                {expenses.map((expense) => {
-                  const payer = group?.members.find(m => m.id === expense.payer_id);
-                  
-                  // Get all split members including payer
-                  const allSplitMembers = expense.splits.map(split => {
-                    const member = group?.members.find(m => m.id === split.user_id);
-                    const isPayer = split.user_id === expense.payer_id;
-                    return {
-                      name: member?.username || 'Unknown',
-                      amount: split.amount,
-                      isPayer
-                    };
-                  });
-
-                  return (
-                    <div key={expense.id} className="flex flex-col space-y-2 p-4 rounded-lg border">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-grow">
-                          <h3 className="font-medium">{expense.description}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Paid by {payer?.username || 'Unknown'} • {new Date(expense.date).toLocaleDateString()}
-                          </p>
-                          <div className="mt-2">
-                            <p className="text-sm font-medium text-muted-foreground mb-1">Split between:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {allSplitMembers.map((member, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm 
-                                    ${member.isPayer ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-secondary'}`}
-                                >
-                                  <span className="font-medium">
-                                    {member.name}
-                                    {member.isPayer && " (Paid)"}
-                                  </span>
-                                  <span className={`${member.isPayer ? 'text-primary/70' : 'text-muted-foreground'}`}>
-                                    ({group?.currency} {member.amount.toFixed(2)})
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+            <div className="space-y-4">
+              {expenses.map((expense) => {
+                const payer = group?.members.find(m => m.id === expense.payer_id);
+                const isPayer = expense.payer_id === currentUser?.id;
+                const userSplit = expense.splits.find(split => split.user_id === currentUser?.id);
+                const canSettle = !isPayer && userSplit && !userSplit.is_settled;
+                
+                return (
+                  <div key={expense.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="text-lg font-semibold">{expense.description}</h3>
+                        <p className="text-sm text-gray-600">
+                          Paid by {payer?.username} • {new Date(expense.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-lg font-semibold">
+                          {formatCurrency(expense.amount, group?.currency || 'USD')}
                         </div>
-                        <div className="flex items-start space-x-4">
-                          <p className="text-lg font-semibold">
-                            {group?.currency} {expense.amount.toFixed(2)}
-                          </p>
+                        {canSettle && (
                           <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8"
+                            className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white"
+                            size="sm"
+                            onClick={() => handleSettleExpense(expense.id)}
+                          >
+                            Settle
+                          </Button>
+                        )}
+                        {isPayer && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400"
                             onClick={() => handleDeleteExpense(expense.id)}
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
-                {expenses.length === 0 && (
-                  <div className="text-center text-muted-foreground py-8">
-                    No expenses yet. Add one to get started!
+                    <div className="mt-2 text-sm space-y-1">
+                      {expense.splits.map((split) => {
+                        const user = group?.members.find(m => m.id === split.user_id);
+                        return (
+                          <div key={split.id} className="flex justify-between items-center">
+                            <span className="flex items-center gap-2">
+                              {user?.username}
+                              {split.is_settled && (
+                                <Badge 
+                                  variant="secondary"
+                                  className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                                >
+                                  Settled
+                                </Badge>
+                              )}
+                            </span>
+                            <span>{formatCurrency(expense.amount / expense.splits.length, group?.currency || 'USD')}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Delete Confirmation Dialog */}
-      {isDeleteConfirmOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">Delete Expense</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this expense? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={cancelDeleteExpense}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteExpense}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium"
-              >
-                Delete
-              </button>
+        {/* Delete Confirmation Dialog */}
+        {isDeleteConfirmOpen && (
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+              <h3 className="text-xl font-semibold mb-4 dark:text-gray-100">Delete Expense</h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Are you sure you want to delete this expense? This action cannot be undone.
+              </p>
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={cancelDeleteExpense}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteExpense}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 font-medium"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

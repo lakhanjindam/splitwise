@@ -24,87 +24,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    let ignore = false;
-
-    const checkAuth = async () => {
-      try {
-        // Skip auth check for public paths
-        if (publicPaths.includes(pathname)) {
-          setIsLoading(false);
-          return;
+  const checkAuth = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.getCurrentUser();
+      if (response.data?.status === 'success' && response.data?.data?.user) {
+        setUser(response.data.data.user);
+        // If user is authenticated and on an auth route, redirect to dashboard
+        if (pathname && ['/auth/login', '/auth/register'].includes(pathname)) {
+          router.replace('/dashboard');
         }
-
-        const response = await api.getCurrentUser();
-        if (!ignore) {
-          if (response.data?.status === 'success' && response.data?.data?.user) {
-            setUser(response.data.data.user);
-          } else {
-            setUser(null);
-            if (!publicPaths.includes(pathname)) {
-              router.push('/auth/login');
-            }
-          }
-        }
-      } catch (error) {
-        if (!ignore) {
-          console.error('Auth check failed:', error);
-          setUser(null);
-          if (!publicPaths.includes(pathname)) {
-            router.push('/auth/login');
-          }
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
+      } else {
+        setUser(null);
+        // If user is not authenticated and not on a public path, redirect to login
+        if (pathname && !publicPaths.includes(pathname)) {
+          router.replace('/auth/login');
         }
       }
-    };
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setUser(null);
+      if (pathname && !publicPaths.includes(pathname)) {
+        router.replace('/auth/login');
+      }
+    } finally {
+      // Add a small delay before removing loading state to prevent flashing
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 100);
+    }
+  };
 
+  useEffect(() => {
     checkAuth();
-
-    return () => {
-      ignore = true;
-    };
-  }, [pathname, router]);
+  }, [pathname]);
 
   const login = async (username: string, password: string) => {
     try {
-      setIsLoading(true);
       const response = await api.login(username, password);
       if (response.data?.status === 'success' && response.data?.data?.user) {
         setUser(response.data.data.user);
-        router.push('/dashboard');
+        router.replace('/dashboard');
       } else {
         throw new Error(response.data?.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      setIsLoading(true);
       await api.logout();
       setUser(null);
-      router.push('/auth/login');
+      router.replace('/auth/login');
     } catch (error) {
       console.error('Logout failed:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, setUser }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    isLoading,
+    login,
+    logout,
+    setUser,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

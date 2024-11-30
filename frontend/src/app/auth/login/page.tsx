@@ -1,11 +1,15 @@
-import { Metadata } from 'next';
-import { LoginForm } from '@/components/auth/login-form';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Login | SplitEase',
-  description: 'Login to your SplitEase account',
-};
+import { LoginForm } from '@/components/auth/login-form';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {
+  const { isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   return <LoginForm />;
 }

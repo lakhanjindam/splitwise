@@ -39,6 +39,15 @@ def add_expense(group_id):
         if not split_with or not isinstance(split_with, list):
             return jsonify({'error': 'At least one member must be selected for splitting'}), 400
 
+        # Validate that payer is not creating an expense for themselves only
+        if len(split_with) == 1 and current_user.id in split_with:
+            return jsonify({'error': 'Cannot create an expense for yourself only. Please include other members.'}), 400
+
+        # Validate that at least one other member is included
+        other_members = [member_id for member_id in split_with if member_id != current_user.id]
+        if not other_members:
+            return jsonify({'error': 'At least one other member must be included in the expense split'}), 400
+
         # Create expense
         expense = Expense(
             description=description,
@@ -151,49 +160,45 @@ def delete_expense(expense_id):
 @login_required
 def settle_expense(expense_id):
     try:
-        validate_csrf(request.form.get('csrf_token'))
-    except:
-        flash('Invalid CSRF token. Please try again.', 'danger')
-        return redirect(url_for('main.dashboard'))
-
-    expense = Expense.query.get_or_404(expense_id)
-    
-    # Don't allow payer to settle their own expense
-    if current_user.id == expense.payer_id:
-        flash('You cannot settle an expense you paid for.', 'danger')
-        return redirect(url_for('groups.view_group', group_id=expense.group_id))
-    
-    # Check if user is in the splits
-    user_split = None
-    for split in expense.splits:
-        if split.user_id == current_user.id:
-            user_split = split
-            break
-    
-    if not user_split:
-        flash('You are not involved in this expense.', 'danger')
-        return redirect(url_for('groups.view_group', group_id=expense.group_id))
-    
-    # Calculate the amount this user owes for this expense
-    split_amount = expense.amount / len(expense.splits)
-    
-    # Get current balances
-    group = expense.group
-    payer_balance = group.get_user_balance(expense.payer_id)
-    user_balance = group.get_user_balance(current_user.id)
-    
-    # Mark expense as settled
-    expense.is_settled = True
-    
-    # Update balances
-    user_split.is_settled = True
-    user_split.settled_at = datetime.utcnow()
-    
-    db.session.commit()
-    
-    # Show success message with amount settled
-    flash(f'You settled {expense.get_currency_symbol()}{split_amount:.2f} with {expense.payer.username}!', 'success')
-    return redirect(url_for('groups.view_group', group_id=expense.group_id))
+        expense = Expense.query.get_or_404(expense_id)
+        
+        # Don't allow payer to settle their own expense
+        if current_user.id == expense.payer_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'You cannot settle an expense you paid for'
+            }), 403
+        
+        # Check if user is in the splits
+        user_split = None
+        for split in expense.splits:
+            if split.user_id == current_user.id:
+                user_split = split
+                break
+        
+        if not user_split:
+            return jsonify({
+                'status': 'error',
+                'message': 'You are not involved in this expense'
+            }), 404
+        
+        # Mark split as settled
+        user_split.is_settled = True
+        user_split.settled_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Expense settled successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to settle expense: {str(e)}'
+        }), 500
 
 @expenses.route('/<int:expense_id>', methods=['GET'])
 @login_required

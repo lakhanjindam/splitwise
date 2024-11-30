@@ -36,15 +36,16 @@ export default function DashboardPage() {
         }
         
         // Fetch balance
-        const balanceResponse = await api.getUserBalances()
-        if (balanceResponse.data.status === 'success' && balanceResponse.data.data) {
-          const balanceData = balanceResponse.data.data;
-          setBalance({
-            totalOwed: balanceData.total_owed || 0,
-            totalOwes: balanceData.total_owes || 0,
-            netBalance: balanceData.net_balance || 0
-          })
-        }
+        // TODO: Fetch balance
+        // const balanceResponse = await api.getUserBalances()
+        // if (balanceResponse.data.status === 'success' && balanceResponse.data.data) {
+        //   const balanceData = balanceResponse.data.data;
+        //   setBalance({
+        //     totalOwed: balanceData.total_owed || 0,
+        //     totalOwes: balanceData.total_owes || 0,
+        //     netBalance: balanceData.net_balance || 0
+        //   })
+        // }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
         toast({

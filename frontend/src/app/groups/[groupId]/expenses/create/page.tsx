@@ -12,8 +12,9 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeMount } from "@/hooks/theme-mount"
 import { createExpense } from '@/lib/api/expenses'
 import { getGroupDetails } from '@/lib/api/groups'
+import { api } from '@/lib/api-client'
 import { Group } from '@/types/schema'
-import { toast } from "sonner"
+import { toast, Toaster } from "sonner"
 
 interface CreateExpensePageProps {
   params: {
@@ -30,45 +31,77 @@ export default function CreateExpensePage({ params }: CreateExpensePageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   
   const { isMounted, currentTheme } = useThemeMount();
 
   useEffect(() => {
-    const fetchGroup = async () => {
+    const fetchData = async () => {
       try {
-        const response = await getGroupDetails(params.groupId);
-        setGroup(response.group);
+        const [groupResponse, userResponse] = await Promise.all([
+          getGroupDetails(params.groupId),
+          api.getCurrentUser()
+        ]);
+        setGroup(groupResponse.group);
+        if (userResponse.data.status === 'success' && userResponse.data.data?.user) {
+          setCurrentUser(userResponse.data.data.user);
+        }
       } catch (error) {
-        setError('Failed to load group details');
-        console.error('Error fetching group:', error);
-        toast.error('Failed to load group details');
+        setError('Failed to load required data');
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load required data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGroup();
+    fetchData();
   }, [params.groupId]);
 
-  const handleAddExpense = async () => {
-    // Form validation
+  const validateExpense = () => {
+    const errors = [];
+
     if (!description.trim()) {
-      toast.error('Please enter a description');
-      return;
+      errors.push('Description is required');
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
+      errors.push('Please enter a valid amount');
     }
 
     if (selectedMembers.length === 0) {
-      toast.error('Please select at least one member to split with');
+      errors.push('Select at least one member to split with');
+    } else if (currentUser) {
+      const otherMembers = selectedMembers.filter(id => id !== currentUser.id);
+      if (otherMembers.length === 0) {
+        errors.push('Include at least one other member in the split');
+      }
+    }
+
+    return errors;
+  };
+
+  const handleAddExpense = async () => {
+    const validationErrors = validateExpense();
+    
+    if (validationErrors.length > 0) {
+      toast.error('Please fix the following errors:', {
+        description: (
+          <div className="mt-2">
+            <ul className="list-disc pl-4 space-y-1">
+              {validationErrors.map((error, index) => (
+                <li key={index} className="text-sm">{error}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+        duration: 5000
+      });
       return;
     }
 
+    setSubmitting(true);
     try {
-      setSubmitting(true);
       setError(null);
       
       const response = await createExpense(params.groupId, {
@@ -82,12 +115,11 @@ export default function CreateExpensePage({ params }: CreateExpensePageProps) {
       // Navigate back to group page and refresh
       router.push(`/groups/${params.groupId}`);
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating expense:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create expense';
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create expense';
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
       setSubmitting(false);
     }
   }
@@ -127,7 +159,8 @@ export default function CreateExpensePage({ params }: CreateExpensePageProps) {
 
   return (
     <div className="container mx-auto p-4">
-      <header className="px-4 lg:px-6 h-14 flex items-center justify-between relative z-10">
+      <Toaster richColors position="top-center" />
+      <header className="px-4 lg:px-6 h-14 flex items-center justify-between relative z-10 mb-8">
         <Link className="flex items-center justify-center" href="/">
           <DollarSign className="h-6 w-6 text-primary" />
           <span className={`ml-2 text-2xl font-bold ${gradientClass} text-transparent bg-clip-text`}>
@@ -190,28 +223,37 @@ export default function CreateExpensePage({ params }: CreateExpensePageProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Split with</Label>
-                <div className="col-span-3 grid grid-cols-2 gap-4">
-                  {group.members.map((member) => (
-                    <div key={member.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`member-${member.id}`}
-                        checked={selectedMembers.includes(member.id)}
-                        onChange={() => handleMemberToggle(member.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label 
-                        htmlFor={`member-${member.id}`} 
-                        className="cursor-pointer flex items-center"
-                      >
-                        <User className="inline-block w-4 h-4 mr-2" />
-                        {member.username}
-                      </Label>
+              <div className="space-y-4">
+                <Label>Split with</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {group?.members.map((member) => (
+                    <div
+                      key={member.id}
+                      className={`
+                        flex items-center space-x-2 p-4 rounded-lg border cursor-pointer
+                        ${selectedMembers.includes(member.id) ? 'border-primary bg-primary/5' : 'border-input'}
+                        ${member.id === currentUser?.id ? 'opacity-50' : ''}
+                        hover:bg-accent hover:text-accent-foreground
+                      `}
+                      onClick={() => handleMemberToggle(member.id)}
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {member.username}
+                          {member.id === currentUser?.id && ' (You)'}
+                        </p>
+                      </div>
+                      <div className="flex items-center">
+                        {selectedMembers.includes(member.id) && (
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Select at least one other member to split the expense with.
+                </p>
               </div>
             </div>
           </CardContent>

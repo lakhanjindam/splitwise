@@ -48,7 +48,7 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden">
+        <Button variant="ghost" className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 overflow-hidden">
           <Avatar
             size={32}
             name={user.username}
@@ -57,25 +57,25 @@ export function UserNav() {
           />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-48 sm:w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.username}</p>
-            <p className="text-xs leading-none text-muted-foreground">
+            <p className="text-xs sm:text-sm font-medium leading-none truncate">{user.username}</p>
+            <p className="text-xs leading-none text-muted-foreground truncate">
               {user.email}
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <User className="mr-2 h-4 w-4" />
+          <DropdownMenuItem className="text-xs sm:text-sm">
+            <User className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span>Profile</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
+        <DropdownMenuItem onClick={handleLogout} className="text-xs sm:text-sm">
+          <LogOut className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

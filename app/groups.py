@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from .models import Group, User, db, Expense, ExpenseSplit, group_members
 from flask_wtf.csrf import validate_csrf
+from datetime import datetime
 
 # Create groups blueprint
 groups = Blueprint('groups', __name__, url_prefix='/api/groups')
@@ -274,6 +275,57 @@ def update_group_name(group_id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@groups.route('/<int:group_id>/expenses/<int:expense_id>/settle', methods=['POST'])
+@login_required
+def settle_expense(group_id, expense_id):
+    try:
+        # Get the expense
+        expense = Expense.query.get_or_404(expense_id)
+        
+        # Verify expense belongs to the group
+        if expense.group_id != group_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Expense does not belong to this group'
+            }), 400
+            
+        # Check if the current user is the creator of the expense
+        if expense.created_by_id == current_user.id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Expense creator cannot settle the expense'
+            }), 403
+            
+        # Find the current user's split
+        user_split = ExpenseSplit.query.filter_by(
+            expense_id=expense_id,
+            user_id=current_user.id
+        ).first()
+        
+        if not user_split:
+            return jsonify({
+                'status': 'error',
+                'message': 'You are not part of this expense'
+            }), 404
+            
+        # Mark the split as settled
+        user_split.is_settled = True
+        user_split.settled_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Expense settled successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to settle expense: {str(e)}'
+        }), 500
 
 @groups.route('/<int:group_id>', methods=['DELETE'])
 @login_required
